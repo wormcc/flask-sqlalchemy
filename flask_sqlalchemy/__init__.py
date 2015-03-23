@@ -22,7 +22,7 @@ from flask import _request_ctx_stack, abort, has_request_context, request
 from flask.signals import Namespace
 from operator import itemgetter
 from threading import Lock
-from sqlalchemy import orm, event, inspect
+from sqlalchemy import orm, event, inspect, func
 from sqlalchemy.orm.exc import UnmappedClassError
 from sqlalchemy.orm.session import Session as SessionBase
 from sqlalchemy.engine.url import make_url
@@ -48,6 +48,10 @@ __version__ = '2.0'
 # Which stack should we use?  _app_ctx_stack is new in 0.9
 connection_stack = _app_ctx_stack or _request_ctx_stack
 
+def get_count(q):
+    count_q = q.statement.with_only_columns([func.count()]).order_by(None)
+    count = q.session.execute(count_q).scalar()
+    return count
 
 _camelcase_re = re.compile(r'([A-Z]+)(?=[a-z0-9])')
 _signals = Namespace()
@@ -478,7 +482,7 @@ class BaseQuery(orm.Query):
         if page == 1 and len(items) < per_page:
             total = len(items)
         else:
-            total = self.order_by(None).count()
+            total = get_count(self.order_by(None))
 
         return Pagination(self, page, per_page, total, items)
 
